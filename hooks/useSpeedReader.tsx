@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-const calculatePivotIndex = (x) => (x.length !== 1 ? Math.floor(x.length / 7 + 1) : 0);
+const calculatePivotIndex = (x = '') => (x.length !== 1 ? Math.floor(x.length / 7 + 1) : 0);
 
 export type SpeedReaderMatch = {
   pattern: RegExp
@@ -8,9 +8,6 @@ export type SpeedReaderMatch = {
 }
 
 export const defaultPausing = [{
-  pattern: /,|-/,
-  durationInSec: 0.25,
-}, {
   pattern: /\.|!|\?|:|;/,
   durationInSec: 0.5,
 }, {
@@ -43,23 +40,9 @@ export const useSpeedReader = ({
   onRenderWord = () => { },
 }: SpeedReaderProps): SpeedReaderDisplayState => {
   const words = text.trim().replace(/([\r\n]+)/gm, '$1 ').split(/[^\S\r\n]+/);
+  const sanitizedWordIndex = wordIndex > words.length - 1 ? words.length - 1 : wordIndex;
 
-  if (words.length <= 1) {
-    return {
-      word: '',
-      pivotElementIndex: -1,
-    };
-  }
-
-  if (wordIndex > words.length - 1) {
-    console.warn('wordIndex must not be larger than wordcount');
-    return {
-      word: '',
-      pivotElementIndex: -1,
-    };
-  }
-
-  const [currentIndex, setCurrentIndex] = useState<number>(wordIndex);
+  const [currentIndex, setCurrentIndex] = useState<number>(sanitizedWordIndex);
   const word = words[currentIndex];
 
   const play = (offset: number = 0) => {
@@ -85,7 +68,7 @@ export const useSpeedReader = ({
       }
     }
     play(0);
-  }, [isPaused, currentIndex]);
+  }, [isPaused, currentIndex, word]);
 
   onRenderWord({
     word,

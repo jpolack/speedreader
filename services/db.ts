@@ -1,62 +1,102 @@
 import { v4 as uuid } from 'uuid';
 
-export type DatabaseIndex = {
-    books: { [id: string]: BookMeta }
-}
-
 export type BookMeta = {
-    id: string,
-    title: string
+  id: string
+  title: string
 }
 
-const keyPrefix = 'speedread_';
-const bookPrefix = 'book_';
+export type Book = {
+  id: string
+  binary: string
+}
 
-export const readIndex = (): DatabaseIndex => {
-  if (!process.browser) {
-    return {
-      books: {},
+const dbName = 'speedreader';
+const version = 1;
+
+const objectStores = {
+  books: 'books',
+  bookMetas: 'bookMetas',
+};
+
+const open = async (): Promise<IDBDatabase> => {
+  const request = window.indexedDB.open(dbName, version);
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    request.onerror = () => {
+      reject();
     };
-  }
-  const index = JSON.parse(window.localStorage.getItem(`${keyPrefix}index`));
-  return index;
+    request.onsuccess = () => {
+      resolve(request.result);
+    };
+    request.onupgradeneeded = () => {
+      const db = request.result;
+
+      Object.values(objectStores).forEach((val) => {
+        db.createObjectStore(val, { keyPath: 'id' });
+      });
+    };
+  });
 };
-export const writeIndex = (index: DatabaseIndex) => {
-  if (!process.browser) {
-    return;
-  }
-  window.localStorage.setItem(`${keyPrefix}index`, JSON.stringify(index));
+
+export const listBooks = async (): Promise<BookMeta[]> => {
+  const db = await open();
+
+  return new Promise((resolve) => {
+    db
+      .transaction(objectStores.bookMetas)
+      .objectStore(objectStores.bookMetas)
+      .getAll()
+      .addEventListener('success', (event: any) => {
+        resolve(event.target.result as BookMeta[]);
+      });
+  });
 };
-export const read = (id): string | undefined => {
-  if (!process.browser) {
-    return undefined;
-  }
-  return window.localStorage.getItem(`${keyPrefix}${bookPrefix}${id}`);
-};
-export const update = (id: string, binary: string): void => {
-  if (!process.browser) {
-    return;
-  }
-  const index = readIndex();
-  if (id && index.books[id]) {
-    window.localStorage.setItem(`${keyPrefix}${bookPrefix}${id}`, binary);
-  }
-};
-export const write = (binary: string, title: string): void => {
-  if (!process.browser) {
-    return;
-  }
+
+export const saveBook = async (book: string, title: string): Promise<BookMeta> => {
+  const db = await open();
+
   const id = uuid();
-  const index = readIndex();
-  window.localStorage.setItem(`${keyPrefix}${bookPrefix}${id}`, binary);
-  writeIndex({
-    ...index,
-    books: {
-      ...index?.books,
-      [id]: {
-        id,
-        title,
-      },
-    },
+  const bookMeta = {
+    id,
+    title,
+  };
+
+  await Promise.all([
+    new Promise((resolve) => {
+      db
+        .transaction(objectStores.bookMetas, 'readwrite')
+        .objectStore(objectStores.bookMetas)
+        .add(bookMeta)
+        .addEventListener('success', (event: any) => {
+          resolve(event.target.result as string);
+        });
+    }),
+    new Promise((resolve) => {
+      db
+        .transaction(objectStores.books, 'readwrite')
+        .objectStore(objectStores.books)
+        .add({
+          id,
+          binary: book,
+        })
+        .addEventListener('success', (event: any) => {
+          resolve(event.target.result as string);
+        });
+    }),
+  ]);
+
+  return bookMeta;
+};
+
+export const getBook = async (id: string): Promise<Book> => {
+  const db = await open();
+
+  return new Promise((resolve) => {
+    db
+      .transaction(objectStores.books)
+      .objectStore(objectStores.books)
+      .get(id)
+      .addEventListener('success', (event: any) => {
+        resolve(event.target.result as Book);
+      });
   });
 };
