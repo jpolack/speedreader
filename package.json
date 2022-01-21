@@ -11,7 +11,7 @@
   "dependencies": {
     "@material-ui/core": "^4.10.2",
     "b64-to-blob": "^1.2.19",
-    "epubjs": "^0.3.87",
+    "epubjs": "^0.3.89",
     "next": "9.4.4",
     "react": "16.13.1",
     "react-dom": "16.13.1",
